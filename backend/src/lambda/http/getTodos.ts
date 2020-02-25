@@ -1,29 +1,26 @@
 import 'source-map-support/register'
 import * as AWS  from 'aws-sdk'
+import * as AWSXRay from 'aws-xray-sdk'
 import { APIGatewayProxyEvent, APIGatewayProxyResult, APIGatewayProxyHandler } from 'aws-lambda'
 
-import { parseUserId } from '../../auth/utils'
+import { getUserId } from '../utils'
 
-const docClient = new AWS.DynamoDB.DocumentClient()
+const XAWS = AWSXRay.captureAWS(AWS)
+const docClient = new XAWS.DynamoDB.DocumentClient()
 
 const todosTable = process.env.TODOS_TABLE
 
 export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-  const authorization = event.headers.Authorization
-  const split = authorization.split(' ')
-  const jwtToken = split[1]
-  const userId = parseUserId(jwtToken);
-
+  const userId = getUserId(event);
   const toDos = await getTodosPerUser(userId)
 
   return {
     statusCode: 200,
     headers: {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Credentials': true
     },
     body: JSON.stringify({
-      toDos
+      items: toDos
     })
   }
 }
@@ -31,6 +28,7 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
 async function getTodosPerUser(userId: string) {
   const result = await docClient.query({
     TableName: todosTable,
+    IndexName: process.env.TODOS_USERID_INDEX,
     KeyConditionExpression: 'userId = :userId',
     ExpressionAttributeValues: {
       ':userId': userId
