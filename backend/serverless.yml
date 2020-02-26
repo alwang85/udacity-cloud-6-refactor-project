@@ -34,6 +34,7 @@ provider:
   environment:
     TODOS_TABLE: Todos-${self:provider.stage}
     TODOS_USERID_INDEX: Todos_userId_Index
+    TODOS_TODOID_INDEX: Todos_todoId_Index
     IMAGES_S3_BUCKET: serverless-todos-images-alwang85-${self:provider.stage}
     SIGNED_URL_EXPIRATION: 300
 
@@ -115,8 +116,11 @@ functions:
           - xray:PutTraceSegments
           - xray:PutTelemetryRecords
         Resource: "*"
+      - Effect: Allow
+        Action:
+          - dynamodb:Query
+        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}/index/${self:provider.environment.TODOS_TODOID_INDEX}
 
-  # TODO: Configure this function
   DeleteTodo:
     handler: src/lambda/http/deleteTodo.handler
     events:
@@ -133,11 +137,14 @@ functions:
         Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
       - Effect: Allow
         Action:
+          - dynamodb:Query
+        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}/index/${self:provider.environment.TODOS_TODOID_INDEX}
+      - Effect: Allow
+        Action:
           - xray:PutTraceSegments
           - xray:PutTelemetryRecords
         Resource: "*"
 
-  # TODO: Configure this function
   GenerateUploadUrl:
     handler: src/lambda/http/generateUploadUrl.handler
     events:
@@ -152,6 +159,10 @@ functions:
           - dynamodb:Query
           - dynamodb:UpdateItem
         Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
+      - Effect: Allow
+        Action:
+          - dynamodb:Query
+        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}/index/${self:provider.environment.TODOS_TODOID_INDEX}
       - Effect: Allow
         Action:
           - s3:PutObject
@@ -223,6 +234,12 @@ resources:
           - IndexName: ${self:provider.environment.TODOS_USERID_INDEX}
             KeySchema:
             - AttributeName: userId
+              KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+          - IndexName: ${self:provider.environment.TODOS_TODOID_INDEX}
+            KeySchema:
+            - AttributeName: todoId
               KeyType: HASH
             Projection:
               ProjectionType: ALL
