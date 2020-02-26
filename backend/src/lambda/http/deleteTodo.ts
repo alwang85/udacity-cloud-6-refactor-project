@@ -4,6 +4,8 @@ import * as AWSXRay from 'aws-xray-sdk'
 import { APIGatewayProxyEvent, APIGatewayProxyResult, APIGatewayProxyHandler } from 'aws-lambda'
 
 import { getUserId } from '../utils'
+import { createLogger } from '../../utils/logger'
+const logger = createLogger('deleteTodo')
 
 const XAWS = AWSXRay.captureAWS(AWS)
 const docClient = new XAWS.DynamoDB.DocumentClient()
@@ -29,17 +31,19 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
       })
       .promise()
 
-      return {
-        statusCode: 204,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-        },
-        body: 'success'
-      }
-  } catch(e) { // TODO figure out status codes
-    console.log('error deleting!', e)
+    logger.info('todo deleted:', todoId);
+    
     return {
-      statusCode: 404,
+      statusCode: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+      },
+      body: 'success'
+    }
+  } catch(e) {
+    logger.error('error deleting!', e)
+    return {
+      statusCode: 500,
       headers: {
         'Access-Control-Allow-Origin': '*',
       },

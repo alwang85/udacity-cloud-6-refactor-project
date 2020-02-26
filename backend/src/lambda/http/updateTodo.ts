@@ -4,6 +4,8 @@ import * as AWSXRay from 'aws-xray-sdk'
 import { APIGatewayProxyEvent, APIGatewayProxyHandler, APIGatewayProxyResult } from 'aws-lambda'
 
 import { getUserId } from '../utils'
+import { createLogger } from '../../utils/logger'
+const logger = createLogger('generateUpload')
 import { UpdateTodoRequest } from '../../requests/UpdateTodoRequest'
 
 const XAWS = AWSXRay.captureAWS(AWS)
@@ -16,18 +18,16 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
   const userId = getUserId(event)
   const updatedTodo: UpdateTodoRequest = JSON.parse(event.body)
 
-  // TODO enable S3 update later
   try {
     const result = await docClient
       .update({
         TableName: todosTable,
         Key: {
           todoId,
+          userId,
         },
-        UpdateExpression: "set name = :name, dueDate=:dueDate, done=:done",
+        UpdateExpression: "set done=:done",
         ExpressionAttributeValues:{
-            ":name":updatedTodo.name,
-            ":dueDate":updatedTodo.dueDate,
             ":done":updatedTodo.done,
             ':userId' : userId,
         },
@@ -35,19 +35,21 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
         ReturnValues:"UPDATED_NEW"
       })
       .promise()
+    
+    logger.info('todo updated', todoId);
 
-      return {
-        statusCode: 200,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Credentials': true
-        },
-        body: JSON.stringify(result)
-      }
-  } catch(e) { // TODO figure out status codes
-    console.log('error updating!', e)
     return {
-      statusCode: 404,
+      statusCode: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Credentials': true
+      },
+      body: JSON.stringify(result)
+    }
+  } catch(e) {
+    logger.error('failed update', e);
+    return {
+      statusCode: 500,
       body: JSON.stringify({
         error: e
       })

@@ -4,6 +4,8 @@ import * as AWSXRay from 'aws-xray-sdk'
 import { APIGatewayProxyEvent, APIGatewayProxyResult, APIGatewayProxyHandler } from 'aws-lambda'
 
 import { getUserId } from '../utils'
+import { createLogger } from '../../utils/logger'
+const logger = createLogger('getTodos')
 
 const XAWS = AWSXRay.captureAWS(AWS)
 const docClient = new XAWS.DynamoDB.DocumentClient()
@@ -12,17 +14,31 @@ const todosTable = process.env.TODOS_TABLE
 
 export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   const userId = getUserId(event);
-  const toDos = await getTodosPerUser(userId)
 
-  return {
-    statusCode: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-    },
-    body: JSON.stringify({
-      items: toDos
-    })
+  try {
+    const toDos = await getTodosPerUser(userId)
+
+    logger.info('todo fetching success:');
+  
+    return {
+      statusCode: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+      },
+      body: JSON.stringify({
+        items: toDos
+      })
+    }
+  } catch(e) {
+    logger.error('failed to get', e);
+    return {
+      statusCode: 401,
+      body: JSON.stringify({
+        error: e
+      })
+    }
   }
+  
 }
 
 async function getTodosPerUser(userId: string) {
