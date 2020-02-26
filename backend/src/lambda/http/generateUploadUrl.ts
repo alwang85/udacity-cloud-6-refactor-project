@@ -4,13 +4,11 @@ import * as AWSXRay from 'aws-xray-sdk'
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult, APIGatewayProxyHandler } from 'aws-lambda'
 import { getUserId } from '../utils'
+import { updateTodo, getTodoById } from '../../businessLogic/todos'
 import { createLogger } from '../../utils/logger'
 const logger = createLogger('generateUpload')
 
 const XAWS = AWSXRay.captureAWS(AWS)
-const docClient = new XAWS.DynamoDB.DocumentClient()
-
-const todosTable = process.env.TODOS_TABLE
 const s3 = new XAWS.S3({
   signatureVersion: 'v4'
 })
@@ -22,44 +20,35 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
   const todoId = event.pathParameters.todoId
   const imageId = todoId
   const userId = getUserId(event)
-
-  const url = getUploadUrl(imageId)
-  const attachmentUrl = `https://${bucketName}.s3.us-east-1.amazonaws.com/${imageId}`
-
+  const uploadUrl = getUploadUrl(imageId)
+ 
   try {
-    await docClient
-      .update({
-        TableName: todosTable,
-        Key: {
-          todoId,
-          userId,
-        },
-        UpdateExpression: "set attachmentUrl=:attachmentUrl",
-        ExpressionAttributeValues: {
-            ":attachmentUrl": attachmentUrl,
-            ':userId' : userId,
-        },
-        ConditionExpression: 'userId = :userId',
-        ReturnValues:"UPDATED_NEW"
-      })
-      .promise()
+    const oldTodo = await getTodoById(todoId);
+    const newTodo = {
+      ...oldTodo,
+      attachmentUrl: `https://${bucketName}.s3.us-east-1.amazonaws.com/${imageId}`
+    };
 
-    logger.info('upload url generated:', url);
+    await updateTodo(newTodo, userId);
+
+    logger.info('upload url generated:', uploadUrl);
     
     return {
       statusCode: 201,
       headers: {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Credentials': true
       },
       body: JSON.stringify({
-        uploadUrl: url
+        uploadUrl: uploadUrl
       })
     }
   } catch (e) {
     logger.error('failed to create upload url', e);
     return {
       statusCode: 500,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+      },
       body: JSON.stringify({
         error: e
       })

@@ -1,40 +1,38 @@
 import 'source-map-support/register'
-import * as AWS  from 'aws-sdk'
-import * as AWSXRay from 'aws-xray-sdk'
 import { APIGatewayProxyEvent, APIGatewayProxyHandler, APIGatewayProxyResult } from 'aws-lambda'
 
-import { getUserId } from '../utils'
 import { createLogger } from '../../utils/logger'
-const logger = createLogger('generateUpload')
 import { UpdateTodoRequest } from '../../requests/UpdateTodoRequest'
+import { updateTodo, getTodoById } from '../../businessLogic/todos'
+import { getUserId } from '../utils'
 
-const XAWS = AWSXRay.captureAWS(AWS)
-const docClient = new XAWS.DynamoDB.DocumentClient()
-
-const todosTable = process.env.TODOS_TABLE
+const logger = createLogger('generateUpload')
 
 export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   const todoId = event.pathParameters.todoId
-  const userId = getUserId(event)
   const updatedTodo: UpdateTodoRequest = JSON.parse(event.body)
+  const currentUserId = getUserId(event);
 
   try {
-    const result = await docClient
-      .update({
-        TableName: todosTable,
-        Key: {
-          todoId,
-          userId,
+    const oldTodo = await getTodoById(todoId);
+
+    if (!oldTodo) {
+      return {
+        statusCode: 404,
+        headers: {
+          'Access-Control-Allow-Origin': '*'
         },
-        UpdateExpression: "set done=:done",
-        ExpressionAttributeValues:{
-            ":done":updatedTodo.done,
-            ':userId' : userId,
-        },
-        ConditionExpression: 'userId = :userId',
-        ReturnValues:"UPDATED_NEW"
-      })
-      .promise()
+        body: ''
+      }    
+    }
+
+    const params = {
+      ...oldTodo,
+      name: updatedTodo.name,
+      done: updatedTodo.done,
+      dueDate: updatedTodo.dueDate,
+    }
+    const result = await updateTodo(params, currentUserId)
     
     logger.info('todo updated', todoId);
 
@@ -42,14 +40,18 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
       statusCode: 200,
       headers: {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Credentials': true
       },
-      body: JSON.stringify(result)
+      body: JSON.stringify({
+        item: result,
+      })
     }
   } catch(e) {
     logger.error('failed update', e);
     return {
       statusCode: 500,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+      },
       body: JSON.stringify({
         error: e
       })

@@ -1,35 +1,30 @@
 import 'source-map-support/register'
-import * as AWS  from 'aws-sdk'
-import * as AWSXRay from 'aws-xray-sdk'
 import { APIGatewayProxyEvent, APIGatewayProxyResult, APIGatewayProxyHandler } from 'aws-lambda'
 
 import { getUserId } from '../utils'
+import { deleteTodo, getTodoById } from '../../businessLogic/todos'
 import { createLogger } from '../../utils/logger'
 const logger = createLogger('deleteTodo')
 
-const XAWS = AWSXRay.captureAWS(AWS)
-const docClient = new XAWS.DynamoDB.DocumentClient()
-
-const todosTable = process.env.TODOS_TABLE
 
 export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   const currentUserId = getUserId(event);
   const todoId = event.pathParameters.todoId
 
   try {
-    await docClient
-      .delete({
-        TableName: todosTable,
-        Key: {
-          todoId,
-          userId: currentUserId,
+    const oldTodo = await getTodoById(todoId);
+
+    if (!oldTodo) {
+      return {
+        statusCode: 404,
+        headers: {
+          'Access-Control-Allow-Origin': '*'
         },
-        ConditionExpression:"userId = :currentUserId",
-        ExpressionAttributeValues: {
-          ":currentUserId": currentUserId
-        }
-      })
-      .promise()
+        body: ''
+      }    
+    }
+
+    await deleteTodo(oldTodo, currentUserId);
 
     logger.info('todo deleted:', todoId);
     
