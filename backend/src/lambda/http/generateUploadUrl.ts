@@ -2,7 +2,9 @@ import 'source-map-support/register'
 import * as AWS  from 'aws-sdk'
 import * as AWSXRay from 'aws-xray-sdk'
 
-import { APIGatewayProxyEvent, APIGatewayProxyResult, APIGatewayProxyHandler } from 'aws-lambda'
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda'
+import * as middy from 'middy'
+import { cors } from 'middy/middlewares'
 import { getUserId } from '../utils'
 import { updateTodo, getTodoById } from '../../businessLogic/todos'
 import { createLogger } from '../../utils/logger'
@@ -16,7 +18,7 @@ const s3 = new XAWS.S3({
 const bucketName = process.env.IMAGES_S3_BUCKET
 const urlExpiration = process.env.SIGNED_URL_EXPIRATION
 
-export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+export const handler = middy(async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   const todoId = event.pathParameters.todoId
   const imageId = todoId
   const userId = getUserId(event)
@@ -54,7 +56,7 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
       })
     }
   }
-}
+})
 
 function getUploadUrl(imageId: string) {
   return s3.getSignedUrl('putObject', {
@@ -63,3 +65,9 @@ function getUploadUrl(imageId: string) {
     Expires: urlExpiration
   })
 }
+
+handler.use(
+  cors({
+    credentials: true
+  })
+)

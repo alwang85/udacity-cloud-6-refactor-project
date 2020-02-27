@@ -1,5 +1,7 @@
 import 'source-map-support/register'
-import { APIGatewayProxyEvent, APIGatewayProxyHandler, APIGatewayProxyResult } from 'aws-lambda'
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda'
+import * as middy from 'middy'
+import { cors } from 'middy/middlewares'
 
 import { createLogger } from '../../utils/logger'
 import { UpdateTodoRequest } from '../../requests/UpdateTodoRequest'
@@ -8,7 +10,7 @@ import { getUserId } from '../utils'
 
 const logger = createLogger('generateUpload')
 
-export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+export const handler = middy(async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   const todoId = event.pathParameters.todoId
   const updatedTodo: UpdateTodoRequest = JSON.parse(event.body)
   const currentUserId = getUserId(event);
@@ -19,9 +21,6 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
     if (!oldTodo) {
       return {
         statusCode: 404,
-        headers: {
-          'Access-Control-Allow-Origin': '*'
-        },
         body: ''
       }    
     }
@@ -38,9 +37,6 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
 
     return {
       statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-      },
       body: JSON.stringify({
         item: result,
       })
@@ -49,12 +45,15 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
     logger.error('failed update', e);
     return {
       statusCode: 500,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-      },
       body: JSON.stringify({
         error: e
       })
     }
   }
-}
+})
+
+handler.use(
+  cors({
+    credentials: true
+  })
+)
