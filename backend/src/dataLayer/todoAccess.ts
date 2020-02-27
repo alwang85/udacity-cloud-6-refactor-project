@@ -51,7 +51,8 @@ export class TodoAccess {
     todo: TodoItem,
     currentUserId: String,
   ): Promise<TodoItem> {
-    await this.docClient.delete({
+    console.log('deleting item', todo)
+    const deleteditem = await this.docClient.delete({
       TableName: this.todosTable,
         Key: {
           todoId: todo.todoId,
@@ -61,8 +62,9 @@ export class TodoAccess {
         ExpressionAttributeValues: {
           ":currentUserId": currentUserId
         }
-    });
+    }).promise();
 
+    console.log('deleted item', deleteditem)
     return todo;
   }
 
