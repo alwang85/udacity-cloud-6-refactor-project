@@ -22,9 +22,6 @@ export const handler = middy(async (event: APIGatewayProxyEvent): Promise<APIGat
 
     return {
       statusCode: 201,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-      },
       body: JSON.stringify({
         item: createdItem,
       })
@@ -33,9 +30,6 @@ export const handler = middy(async (event: APIGatewayProxyEvent): Promise<APIGat
     logger.error('failed create', e);
     return {
       statusCode: 500,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-      },
       body: JSON.stringify({
         error: e
       })

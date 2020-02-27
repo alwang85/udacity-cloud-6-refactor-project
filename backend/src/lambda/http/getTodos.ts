@@ -1,12 +1,14 @@
 import 'source-map-support/register'
-import { APIGatewayProxyEvent, APIGatewayProxyResult, APIGatewayProxyHandler } from 'aws-lambda'
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda'
+import * as middy from 'middy'
+import { cors } from 'middy/middlewares'
 
 import { getUserId } from '../utils'
 import { getAllTodos } from '../../businessLogic/todos'
 import { createLogger } from '../../utils/logger'
 const logger = createLogger('getTodos')
 
-export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+export const handler = middy(async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   const userId = getUserId(event);
 
   try {
@@ -16,9 +18,6 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
   
     return {
       statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-      },
       body: JSON.stringify({
         items: toDos
       })
@@ -27,13 +26,16 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
     logger.error('failed to get', e);
     return {
       statusCode: 401,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-      },
       body: JSON.stringify({
         error: e
       })
     }
   }
   
-}
+})
+
+handler.use(
+  cors({
+    credentials: true
+  })
+)
